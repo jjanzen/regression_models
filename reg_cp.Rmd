@@ -1,0 +1,97 @@
+---
+title: "Automatic vs Manual Transmission"
+author: "JJanzen"
+date: "April 26, 2015"
+output: html_document
+---
+
+###Executive Summary
+
+The purpose of this analysis is to identify whether an Automatic or Manual transmission is better in terms of MPG. The dataset has observations of 32 vehicles, with 11 different variables. Using regression techniques, I reviewed key variables in determining an approach along with results of transmission and impact to MPG. The approach I chose was looking at performance of 1/4 miles times, using similar weight of vehicles, transmission type, and then comparing the MPG. Using regression, I inputted 1/4 mile times of 14sec - 20sec and compared. The results consistently showed Automatic transmission outperforming Manual transmissions by a range of 2.6 - 4.3 MPG. 
+
+###Exploratory
+```{r}
+# reviewing coefficients for entire dataset 
+# summary(lm(mtcars$mpg ~ ., data = mtcars))$coefficients
+# model estimates based on slope coefficients.  I wanted to focus on variables which was a higher magnitude of slope and relatively small Std. Error
+# correlations each variable to MPG
+variables_mtcars <- c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec", "vs", "am", "gear", "carb")
+obj<-data.frame()
+for (i in 1:length(mtcars)) {
+    cor_mtcars <- cor(mtcars[,i],mtcars[,1])
+    obj <- rbind(obj, cor_mtcars)
+}
+corr_variables_mpg <- cbind(variables_mtcars, obj)
+colnames(corr_variables_mpg) <- c("variables","correlation_to_mpg")
+
+# based on the finding of the coefficients and correlations, I decided to focus on "am(transmission)", "mpg", "wt", and "qsec".
+```
+###Transmission by weight, 1/4 mile time, by MPG
+
+The direction I decided to go to compare transmission type based on the exploratory analysis, was to compare similar weight vehicles MPG by 1/4 mile sec time.  This would take use the variables "am", "wt", "mpg", and "qsec".  These variables together would give a clear picture of how transmission impacts MPG. 
+```{r}
+# subset mtcars for automatic transmission
+mtcars_automatic <- subset(mtcars, mtcars[,9] == "0")
+# subset mtcars for manual transmission
+mtcars_manual <- subset(mtcars, mtcars[,9] == "1")
+# suset mtcars for weight between 2.0 and 2.5 for comparison of qsec by transmission (see historgrams in appendix)
+
+# using weight range of 2.5 - 3.5 will give 8 automatic samples and 5 manual samples
+mtcars_weight <- subset(mtcars, mtcars[,6] < 2.5)
+mtcars_weight <- subset(mtcars, mtcars[,6] > 3.5)
+mtcars_automatic_weight <- subset(mtcars, mtcars_weight[,9] == "0")
+mtcars_manual_weight <- subset(mtcars, mtcars_weight[,9] == "1")
+
+# compare the MPG for 1/4 Mile times
+quarter_mile_time <- c(14,16,18,20)
+automatic_y_intercept <- summary(lm(mtcars_automatic_weight$mpg ~ mtcars_automatic_weight$qsec, data = mtcars_automatic_weight))$coefficients[1,1]
+automatic_slope <- summary(lm(mtcars_automatic_weight$mpg ~ mtcars_automatic_weight$qsec, data = mtcars_automatic_weight))$coefficients[2,1]
+
+mpg_quarter_auto <-data.frame()
+for (i in 1:length(quarter_mile_time)) {
+    mpg_qsec_automatic <- automatic_slope * quarter_mile_time[i] + automatic_y_intercept
+    mpg_quarter_auto <- rbind(mpg_quarter_auto, mpg_qsec_automatic)
+}
+mpg_quarter_auto <- cbind("automatic",quarter_mile_time,mpg_quarter_auto)
+colnames(mpg_quarter_auto) <- c("transmission","quarter time", "mpg")
+
+mpg_quarter_manual <-data.frame()
+manual_y_intercept <- summary(lm(mtcars_manual_weight$mpg ~ mtcars_manual_weight$qsec, data = mtcars_manual_weight))$coefficients[1,1]
+manual_slope <- summary(lm(mtcars_manual_weight$mpg ~ mtcars_manual_weight$qsec, data = mtcars_manual_weight))$coefficients[2,1]
+for (i in 1:length(quarter_mile_time)) {
+    mpg_qsec_manual <- manual_slope * quarter_mile_time[i] + manual_y_intercept
+    mpg_quarter_manual <- rbind(mpg_quarter_manual, mpg_qsec_manual)
+}
+mpg_quarter_manual <- cbind("manual",quarter_mile_time,mpg_quarter_manual)
+colnames(mpg_quarter_manual) <- c("transmission","quarter time", "mpg")
+
+mpg_delta <- data.frame()
+for (i in 1:length(quarter_mile_time)) {
+    diff <- mpg_quarter_auto[i,3] - mpg_quarter_manual[i,3]
+    mpg_delta <- rbind(mpg_delta, diff)
+}
+mpg_delta <- cbind(quarter_mile_time,mpg_delta)
+colnames(mpg_delta) <- c("quarter_mile_time","mpg(auto - manual)")
+```
+###Summary of MPG by Transmission
+```{r}
+mpg_delta
+```
+#####By inputing 14sec - 20sec into the regressions models, automatic transmissions were clearly the winner in terms of MPG by a range of 2.6 - 4.3 MPG.
+
+
+
+###Appendix 
+
+```{r}
+# inital thought it would be best to view by weight.  Based on this chart, automatic transmission appeared to have higher MPG.
+# plot mpg vs. wt  
+plot(mtcars$wt,mtcars$mpg, pch=19, col="blue",xlab="Weight",ylab="MPG")
+abline(lm(mtcars$mpg~mtcars$wt),col="red")
+points(mtcars$wt,mtcars$mpg, pch=19, col=((mtcars$am=="1")*1+1))
+legend("topright",c("automatic", "manual"),col=c("black","red"),pch=19)
+
+# to see distribution of weights by transmission
+hist(mtcars_manual$wt, col = "red", main = "Weight", xlab = "Manual Transmisson")
+hist(mtcars_automatic$wt, col = "red", main = "Weight", xlab = "Automatic Transmisson")
+```
